@@ -24,13 +24,73 @@
     var canvas = document.getElementById('myCanvas');
     paper.setup(canvas);
     var tool = new paper.Tool();
+    //Self-defined variables
+    var paths = {};
+    var myID = Math.floor(Math.random() * 1000000);
+    var color = getRandomColor();
 
     // getting the URL (you may want to use for Exercise 3)
     var url = window.location.href;
+    
+    var socket = new WebSocket('wss://p3-websockets-hxuz-helenxuzh.codeanyapp.com/ws/draw');
+    
+    //Draw
+    var myPath = new paper.Path();
+    myPath.strokeColor = color;
+    myPath.strokeWidth = "2";
+    tool.onMouseMove = function(event) {
+        var obj = {id: myID, x: event.point.x, y: event.point.y, color: color};
+        var jsonstr = JSON.stringify(obj);
+        socket.send(jsonstr);
+        myPath.add(event.point);
+    }
 
-    // var socket = new WebSocket(
-    //     'wss://<your url here>/ws/draw');
+    //Get a random color
+    function getRandomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
 
+    //Display massages sent to the server
+    socket.onmessage = function(receivedMessage) {
+        if (url.indexOf("?size=small") > -1) {
+            return;
+        }
+        var o = JSON.parse(receivedMessage.data);
+        var receivedID = (o.id).toString();
+        var rx = o.x;
+        var ry = o.y;
+        var newPoint = new paper.Point(rx, ry);
+        var color = o.color;
+        if (!(receivedID in paths)) {
+            paths[receivedID] = new paper.Path();
+        }
+        paths[receivedID].strokeColor = color;
+        paths[receivedID].add(newPoint); 
+    }
 
+    //Shake to clear
+    window.addEventListener('devicemotion', function(event) {
+        var accX = Math.abs(event.acceleration.x);
+        var accY = Math.abs(event.acceleration.y);
+        if ((accX > 15) || (accY > 15)) {
+            paper.project.clear()
+        }
+    });
+    
+    //Tilt to change color
+    var gamma = 0;
+    window.addEventListener('deviceorientation', function(event) {
+        // Device rotation around Y-axis, in degrees
+        var curr = event.gamma;
+        if ((curr > 45) && (gamma < 30)) {
+            myPath.strokeColor = getRandomColor();
+        }
+        gamma = event.gamma;
+    });
 </script>
 </html>
